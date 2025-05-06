@@ -89,9 +89,4 @@ A partir de então, basta executar:
 ```bash
 predict "Resumo da reunião"
 ```
-
-## Testes
-
-```bash
-pytest
 ```
