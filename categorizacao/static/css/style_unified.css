@@ -1,0 +1,97 @@
+/* Unified interface styling for ResumeAI */
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f5f5f5;
+  color: #333;
+  margin: 0;
+  padding: 20px;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  background: #fff;
+  padding: 30px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border-radius: 8px;
+}
+
+h1 { text-align: center; margin-bottom: 20px; }
+
+.input-section,
+.metadata-section,
+.action-section,
+.output-section {
+  margin-bottom: 24px;
+}
+
+.input-options {
+  margin-bottom: 10px;
+}
+
+textarea {
+  width: 100%;
+  min-height: 150px;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  resize: vertical;
+}
+
+.form-group {
+  margin-bottom: 12px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: bold;
+}
+
+.form-group input[type="text"] {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.btn {
+  display: inline-block;
+  padding: 8px 16px;
+  margin-right: 8px;
+  border: none;
+  border-radius: 4px;
+  background-color: #007BFF;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.btn:hover { background-color: #0056b3; }
+
+.btn:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+#statusArea p { margin: 4px 0; }
+
+#statusArea strong { display: inline-block; width: 80px; }
+
+#notionLink a {
+  color: #007BFF;
+  text-decoration: none;
+}
+
+#notionLink a:hover { text-decoration: underline; }
+
+pre#processedTextDisplay {
+  background: #f0f0f0;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin-top: 8px;
+}

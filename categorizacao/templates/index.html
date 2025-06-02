@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ResumeAI - Unified Interface</title>
+    <link href="{{ url_for('static', filename='css/style_unified.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1>ResumeAI 🎙️📝➡️ Notion</h1>
+
+        <div class="input-section">
+            <h2>1. Insira o Conteúdo</h2>
+            <div class="input-options">
+                <button id="startButton" class="btn btn-mic">▶️ Iniciar Gravação</button>
+                <button id="stopButton" class="btn btn-stop" disabled>⏹️ Parar Gravação</button>
+            </div>
+            <textarea id="textInput" rows="10" placeholder="Digite seu texto aqui ou aguarde a transcrição da gravação..."></textarea>
+        </div>
+
+        <div class="metadata-section">
+            <h2>2. Detalhes para o Notion (Opcional)</h2>
+            <div class="form-group">
+                <label for="sourceType">Tipo da Fonte:</label>
+                <input type="text" id="sourceType" placeholder="Ex: Reunião, Aula, Palestra">
+            </div>
+            <div class="form-group">
+                <label for="sourceName">Nome da Fonte:</label>
+                <input type="text" id="sourceName" placeholder="Ex: Reunião Semanal de Projeto, Aula de IA">
+            </div>
+        </div>
+
+        <div class="model-section">
+            <h2>3. Selecionar Modelo</h2>
+            <select id="modelSelect" class="form-group">
+                <option value="tfidf">TF-IDF</option>
+                <option value="bert">BERT</option>
+            </select>
+        </div>
+
+        <div class="action-section">
+            <button id="processButton" class="btn btn-process">🚀 Processar e Enviar para o Notion</button>
+        </div>
+
+        <div class="output-section">
+            <h2>4. Resultados</h2>
+            <div id="statusArea">
+                <p><strong>Status:</strong> <span id="statusMessage">Aguardando ação...</span></p>
+                <p><strong>Categoria:</strong> <span id="categoryResult">-</span></p>
+                <p><strong>Notion:</strong> <span id="notionLink">-</span></p>
+            </div>
+            <h3>Texto Processado:</h3>
+            <pre id="processedTextDisplay">-</pre>
+        </div>
+    </div>
+
+    <script>
+        // Speech recognition setup
+        function initializeSpeechRecognition(textAreaId, startButtonId, stopButtonId) {
+            const startButton = document.getElementById(startButtonId);
+            const stopButton = document.getElementById(stopButtonId);
+            const textInput = document.getElementById(textAreaId);
+            let isRecording = false;
+            let transcriptAccum = '';
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                startButton.disabled = true;
+                alert("Seu navegador não suporta reconhecimento de voz.");
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.lang = "pt-BR";
+            recognition.interimResults = false;
+            recognition.continuous = true;
+
+            recognition.onresult = (event) => {
+                let interimTranscript = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    interimTranscript += event.results[i][0].transcript + ' ';
+                }
+                transcriptAccum += interimTranscript.trim() + "\n";
+                textInput.value = transcriptAccum;
+            };
+
+            recognition.onerror = (event) => console.error("Recognition error:", event.error);
+
+            recognition.onend = () => { if (isRecording) recognition.start(); };
+
+            startButton.addEventListener('click', () => {
+                if (!isRecording) {
+                    transcriptAccum = '';
+                    textInput.value = '';
+                    recognition.start();
+                    isRecording = true;
+                    startButton.disabled = true;
+                    stopButton.disabled = false;
+                }
+            });
+
+            stopButton.addEventListener('click', () => {
+                if (isRecording) {
+                    recognition.stop();
+                    isRecording = false;
+                    startButton.disabled = false;
+                    stopButton.disabled = true;
+                }
+            });
+        }
+
+        // Main processing logic
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeSpeechRecognition('textInput', 'startButton', 'stopButton');
+            document.getElementById('processButton').addEventListener('click', async () => {
+                const textInputValue = document.getElementById('textInput').value.trim();
+                const modelType = document.getElementById('modelSelect').value;
+                const sourceType = document.getElementById('sourceType').value.trim();
+                const sourceName = document.getElementById('sourceName').value.trim();
+
+                if (!textInputValue) {
+                    alert('Por favor, insira ou grave algum texto antes de processar.');
+                    return;
+                }
+
+                const resp = await fetch('/api/process', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({
+                        text_input: textInputValue,
+                        source_type: sourceType,
+                        source_name: sourceName,
+                        model: modelType
+                    })
+                });
+                const data = await resp.json();
+
+                document.getElementById('statusMessage').textContent = data.message || '-';
+                document.getElementById('categoryResult').textContent = data.category || '-';
+                if (data.notion_url) {
+                    document.getElementById('notionLink').innerHTML = `<a href="${data.notion_url}" target="_blank">Abrir no Notion</a>`;
+                } else {
+                    document.getElementById('notionLink').textContent = '-';
+                }
+                document.getElementById('processedTextDisplay').textContent = data.text_processed || '-';
+            });
+        });
+    </script>
+</body>
+</html>
