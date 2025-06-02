@@ -165,28 +165,35 @@ function initSpeechToText() {
         return;
     }
     
-    // Set up Speech Recognition
+    // Set up Speech Recognition directly with simpler configuration
+    // This is based on the original speech-to-text module approach
     function setupRecognition() {
+        // Create a new instance directly
         recognition = new SpeechRecognition();
         
-        // Get configuration from backend
+        // Set basic configuration (similar to original module)
+        recognition.lang = 'pt-BR';
+        recognition.continuous = true;
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        
+        console.log('Speech recognition configured with direct settings');
+        
+        // Optional: Only fetch additional config if needed
         fetch('/api/speech-config')
             .then(response => response.json())
             .then(config => {
-                // Apply speech recognition configuration
-                recognition.lang = config.language || 'pt-BR';
-                recognition.continuous = config.continuous || true;
-                recognition.interimResults = config.interimResults || false;
-                recognition.maxAlternatives = config.maxAlternatives || 1;
+                // Only update if values are explicitly provided
+                if (config.language) recognition.lang = config.language;
+                if (config.hasOwnProperty('continuous')) recognition.continuous = config.continuous;
+                if (config.hasOwnProperty('interimResults')) recognition.interimResults = config.interimResults;
+                if (config.maxAlternatives) recognition.maxAlternatives = config.maxAlternatives;
                 
-                console.log('Speech recognition configured:', config);
+                console.log('Speech recognition updated with server config:', config);
             })
             .catch(error => {
-                console.error('Error fetching speech config:', error);
-                // Use defaults if config fails
-                recognition.lang = 'pt-BR';
-                recognition.continuous = true;
-                recognition.interimResults = false;
+                console.error('Error fetching speech config, using defaults:', error);
+                // Already using defaults, so no need to set them again
             });
         
         // Recognition event handlers
@@ -216,33 +223,83 @@ function initSpeechToText() {
         };
         
         recognition.onend = () => {
+            console.log('Recognition ended, isRecording:', isRecording);
             if (isRecording) {
                 // Try to restart if we're still supposed to be recording
-                recognition.start();
+                // Add a small delay to prevent rapid restart attempts
+                setTimeout(() => {
+                    try {
+                        if (isRecording) {
+                            recognition.start();
+                            console.log('Recognition restarted automatically');
+                        }
+                    } catch (error) {
+                        console.error('Error restarting recognition:', error);
+                        isRecording = false;
+                        resetRecordingUI();
+                        showNotification('Erro ao continuar gravação. Por favor, tente novamente.', 'error');
+                    }
+                }, 300);
             } else {
+                resetRecordingUI();
+            }
+        };
+        
+        recognition.onerror = (event) => {
+            console.error('Recognition error:', event.error);
+            elements.statusText.textContent = `Erro: ${event.error}`;
+            
+            // Handle specific errors
+            if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                showNotification('Permissão de microfone negada ou serviço não disponível. Verifique as permissões do navegador.', 'error');
+                isRecording = false;
                 resetRecordingUI();
             }
         };
     }
     
-    function startRecognition() {
-        if (!recognition) {
-            setupRecognition();
-        }
+    // Define recording functions
+    function startRecording() {
+        // Always recreate the recognition object to avoid issues with reusing it
+        setupRecognition();
         
         try {
+            // Update UI first
+            elements.statusIndicator.classList.add('recording');
+            elements.statusText.textContent = 'Gravando...';
+            elements.toggleRecording.innerHTML = '<span class="material-symbols-outlined">stop</span>Parar';
+            elements.toggleRecording.classList.add('recording');
+            
+            // Clear any previous transcript if needed
+            // currentTranscript = ""; // Uncomment to clear previous transcript
+            
+            // Start recognition after UI is updated
             recognition.start();
             isRecording = true;
+            console.log('Speech recognition started');
         } catch (error) {
-            console.error('Error starting recognition:', error);
-            showNotification('Erro ao iniciar gravação. Tente novamente.', 'error');
+            console.error('Error starting speech recognition:', error);
+            showNotification(`Erro ao iniciar gravação: ${error.message}`, 'error');
+            
+            // Reset UI state if recognition fails
+            resetRecordingUI();
         }
     }
     
-    function stopRecognition() {
-        if (recognition) {
-            recognition.stop();
+    function stopRecording() {
+        try {
+            if (recognition) {
+                // Important: Set onend to null before stopping to prevent restart loops
+                recognition.onend = null;
+                recognition.stop();
+                console.log('Speech recognition stopped');
+            }
+        } catch (error) {
+            console.error('Error stopping recognition:', error);
+        } finally {
+            // Always update UI state even if an error occurs
             isRecording = false;
+            resetRecordingUI();
         }
     }
     
@@ -256,9 +313,9 @@ function initSpeechToText() {
     // Event listeners
     elements.toggleRecording.addEventListener('click', () => {
         if (isRecording) {
-            stopRecognition();
+            stopRecording();
         } else {
-            startRecognition();
+            startRecording();
         }
     });
     
