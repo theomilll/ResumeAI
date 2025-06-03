@@ -1,0 +1,4 @@
+Resumo (75% do conteúdo original - 218 palavras):
+A cidade sustentável consegue equilibrar crescimento urbano com preservação ambiental. Isso implica investimentos em transporte público eficiente, incentivo ao uso of bicicletas, criação de áreas verdes, e adoção of fontes de energia renovável, como solar e eólica. Cidades inteligentes, ao integrar tecnologia, conseguem responder de forma mais ágil às demandas da população e às emergências climáticas. A conscientização coletiva, o engajamento em ações comunitárias, a mudança de hábitos de consumo são pilares para transformar o ambiente urbano.
+
+Qualidade do Resumo (BERTScore): 0.7886958122253418

@@ -1,0 +1,4 @@
+Resumo (25% do conteúdo original - 72 palavras):
+A cidade sustentável consegue equilibrar crescimento urbano com preservação ambiental. Isso implica investimentos em transporte público eficiente, incentivo ao uso of bicicletas, criação de áreas verdes, e adoção of fontes de energia renovável.
+
+Qualidade do Resumo (BERTScore): 0.7532251477241516

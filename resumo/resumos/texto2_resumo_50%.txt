@@ -1,0 +1,4 @@
+Resumo (50% do conteúdo original - 112 palavras):
+A corrida é uma forma de expressão, superação e autoconhecimento. Ela ajuda a melhorar a saúde cardiovascular, fortalece os músculos e queima calorias, contribuindo para a perda de peso. Endorfinas promovem bem-estar emocional, reduzem sintomas de ansiedade e depressão.
+
+Qualidade do Resumo (BERTScore): 0.7653613686561584
