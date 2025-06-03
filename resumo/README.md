@@ -19,8 +19,11 @@ pip install -r requirements.txt
 ## Estrutura do Projeto
 
 ├── main.py                  # Script principal que gera e avalia os resumos
+
 ├── texts/                   # Pasta onde devem ser colocados os arquivos .txt de entrada
+
 ├── resumos/                 # Pasta onde os resumos gerados serão salvos
+
 └── requirements.txt         # Dependências do projeto
 
 ## Como Usar
@@ -35,8 +38,11 @@ Os resumos serão gerados automaticamente dentro da pasta resumos/. Para cada te
 ## Detalhes do Funcionamento
 
 Modelo Utilizado: facebook/bart-large-cnn
+
 Pipeline: Hugging Face Transformers (pipeline("summarization"))
+
 Tamanhos de resumo: calculados proporcionalmente ao número de palavras do texto original.
+
 Avaliação: utiliza o bert_score para medir a similaridade semântica entre o resumo e o texto original.
 
 ## Exemplo de Saída
@@ -44,8 +50,11 @@ Avaliação: utiliza o bert_score para medir a similaridade semântica entre o r
 Dado um arquivo relatorio.txt, o programa irá gerar:
 
 resumos/
+
 ├── relatorio_resumo_25%.txt
+
 ├── relatorio_resumo_50%.txt
+
 └── relatorio_resumo_75%.txt
 
 Cada arquivo conterá:
