@@ -1,2 +1,0 @@
-notion-client>=2.3.0
-httpx>=0.23.0

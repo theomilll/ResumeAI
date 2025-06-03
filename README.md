@@ -58,6 +58,46 @@ Contribuições são bem‑vindas! Abra um *issue* ou *pull request* para partic
 
 ---
 
+## 🛠️ Requisitos de Sistema
+
+Além das dependências Python listadas em `requirements.txt`, este projeto requer os seguintes programas instalados no sistema operacional:
+
+---
+
+### ✅ Java (necessário para o funcionamento do `language_tool_python`)
+
+- O LanguageTool agora exige **Java 17 ou superior**.
+- Baixe o **JDK 17 para Windows (Instalador .exe)** diretamente da Oracle:
+  
+  🔗 [https://download.oracle.com/java/17/archive/jdk-17.0.12_windows-x64_bin.exe](https://download.oracle.com/java/17/archive/jdk-17.0.12_windows-x64_bin.exe)
+
+- Após a instalação:
+  1. Reinicie o terminal ou VS Code.
+  2. Verifique com:
+     ```bash
+     java -version
+     ```
+
+---
+
+### ✅ FFmpeg (necessário para o Whisper)
+
+- O Whisper usa `ffmpeg` para processar arquivos de áudio (.wav, .mp3, etc.).
+- Baixe uma build confiável no site:
+
+  🔗 [https://www.gyan.dev/ffmpeg/builds/#](https://www.gyan.dev/ffmpeg/builds/#)
+
+#### 📦 Instalação no Windows:
+1. Baixe o arquivo `ffmpeg-release-full.zip`.
+2. Extraia o conteúdo em uma pasta fixa, como `C:\ffmpeg`.
+3. Adicione `C:\ffmpeg\bin` à variável de ambiente `Path`:
+   - Menu Iniciar → “Variáveis de Ambiente” → Edite `Path`.
+
+4. Reinicie o terminal e teste com:
+
+```bash
+ffmpeg -version
+
 ## 📜 Licença
 
 Distribuído sob a licença **MIT**. Consulte o arquivo `LICENSE` para detalhes.
