@@ -1,7 +1,7 @@
 import os
 import sys
 import logging
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, render_template, send_from_directory, session
 from dotenv import load_dotenv
 import joblib
 
@@ -64,6 +64,35 @@ except ImportError as e:
         logger.error(f"Failed to import NotionExporter using spec loader: {e}")
         NotionExporter = None
 
+# Import speech_to_text modules
+try:
+    # Add speech_to_text path at the beginning to prioritize it
+    sys.path.insert(0, os.path.join(PARENT_DIR, 'speech_to_text'))
+    from recorder import listar_dispositivos_entrada, sugerir_dispositivo_padrao, gravar_sem_limite
+    from transcriber import transcribe_audio
+    from summarizer import resumir_com_gemini
+    from resumo_generator import gerar_resumo
+    logger.info("Successfully imported speech_to_text modules")
+except ImportError as e:
+    logger.error(f"Failed to import speech_to_text modules: {e}")
+    import traceback
+    traceback.print_exc()
+    listar_dispositivos_entrada = None
+    sugerir_dispositivo_padrao = None
+    gravar_sem_limite = None
+    transcribe_audio = None
+    resumir_com_gemini = None
+    gerar_resumo = None
+
+# Import resumo module for ML summarization
+try:
+    sys.path.insert(0, os.path.join(PARENT_DIR, 'resumo'))
+    from ML_Summarizer import gerar_resumo_completo
+    logger.info("Successfully imported ML_Summarizer")
+except ImportError as e:
+    logger.error(f"Failed to import ML_Summarizer: {e}")
+    gerar_resumo_completo = None
+
 # Import the categorization modules
 try:
     sys.path.insert(0, os.path.join(CATEGORIZATION_PATH, 'src'))
@@ -76,6 +105,7 @@ except ImportError as e:
     load_tfidf_encoder = None
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
 # --- Configuration ---
 DEBUG = os.environ.get('FLASK_ENV') == 'development'
@@ -356,16 +386,17 @@ def export_to_notion():
         
         if export_type == 'page':
             # Create a new page in the specified parent page
-            page_id = notion.create_page(
+            response = notion.create_page(
+                parent_page_id=destination_id,
                 title=title,
-                parent_id=destination_id,
                 content=content,
                 categories=categories,
                 source_type=source_type,
                 language=language
             )
             
-            if page_id:
+            if response:
+                page_id = response.get('id', '')
                 # Try to construct a URL to the page
                 notion_url = f"https://notion.so/{page_id.replace('-', '')}"
                 return jsonify({
@@ -379,7 +410,7 @@ def export_to_notion():
         
         elif export_type == 'database':
             # Add an item to a database
-            item_id = notion.create_database_item(
+            response = notion.create_database_item(
                 database_id=destination_id,
                 title=title,
                 content=content,
@@ -389,7 +420,8 @@ def export_to_notion():
                 language=language
             )
             
-            if item_id:
+            if response:
+                item_id = response.get('id', '')
                 # Try to construct a URL to the database item
                 notion_url = f"https://notion.so/{item_id.replace('-', '')}"
                 return jsonify({
@@ -499,16 +531,17 @@ def process():
                 notion = NotionExporter(notion_token)
                 
                 if export_type == 'page':
-                    page_id = notion.create_page(
+                    response = notion.create_page(
+                        parent_page_id=destination_id,
                         title=title,
-                        parent_id=destination_id,
                         content=text,
                         categories=[category_result],
                         source_type=data.get('source_type', 'text'),
                         language=data.get('language', 'pt-BR')
                     )
                     
-                    if page_id:
+                    if response:
+                        page_id = response.get('id', '')
                         notion_url = f"https://notion.so/{page_id.replace('-', '')}"
                         result["notion_export"] = {
                             "success": True,
@@ -519,7 +552,7 @@ def process():
                         result["notion_export"] = {"success": False, "error": "Failed to create Notion page"}
                 
                 elif export_type == 'database':
-                    item_id = notion.create_database_item(
+                    response = notion.create_database_item(
                         database_id=destination_id,
                         title=title,
                         content=text,
@@ -529,7 +562,8 @@ def process():
                         language=data.get('language', 'pt-BR')
                     )
                     
-                    if item_id:
+                    if response:
+                        item_id = response.get('id', '')
                         notion_url = f"https://notion.so/{item_id.replace('-', '')}"
                         result["notion_export"] = {
                             "success": True,
@@ -550,6 +584,343 @@ def process():
     
     except Exception as e:
         print(f"Error during processing: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/process-with-summary', methods=['POST'])
+def process_with_summary():
+    """
+    Process text with full pipeline:
+    1. Generate ML summary using BART
+    2. Enhance summary with Gemini
+    3. Categorize the enhanced summary
+    4. Optionally export to Notion
+    """
+    if not request.is_json:
+        return jsonify({"success": False, "error": "Request must be JSON"}), 400
+    
+    data = request.get_json()
+    text = data.get('text', '').strip()
+    model_type = data.get('model', 'tfidf')
+    export_to_notion = data.get('export_to_notion', False)
+    
+    if not text:
+        return jsonify({"success": False, "error": "No text provided"}), 400
+    
+    if not gerar_resumo_completo or not resumir_com_gemini:
+        return jsonify({"success": False, "error": "Summarization modules not available"}), 500
+        
+    logger.info(f"Processing text with full pipeline, length: {len(text)} chars")
+    
+    try:
+        # Step 1: Generate ML summary
+        logger.info("Step 1: Generating ML summary with BART...")
+        ml_summary = gerar_resumo_completo(text)
+        logger.info(f"ML summary generated, length: {len(ml_summary)} chars")
+        
+        # Step 2: Enhance with Gemini
+        logger.info("Step 2: Enhancing summary with Gemini...")
+        enhanced_summary = resumir_com_gemini(ml_summary)
+        logger.info(f"Enhanced summary generated, length: {len(enhanced_summary)} chars")
+        
+        # Step 3: Categorize the enhanced summary
+        logger.info(f"Step 3: Categorizing enhanced summary using {model_type} model...")
+        category_result = None
+        confidence = None
+        
+        if model_type == 'tfidf':
+            if not tfidf_pipeline or not tfidf_encoder:
+                return jsonify({"success": False, "error": "TF-IDF model not loaded"}), 500
+                
+            try:
+                predicted_index = int(tfidf_pipeline.predict([enhanced_summary])[0])
+                logger.info(f"TF-IDF prediction index: {predicted_index}")
+                
+                if isinstance(tfidf_encoder, dict):
+                    category_result = tfidf_encoder.get(predicted_index, 'Outras')
+                else:
+                    category_result = 'Outras'
+                
+                # Get confidence if available
+                if hasattr(tfidf_pipeline, 'predict_proba'):
+                    try:
+                        proba = tfidf_pipeline.predict_proba([enhanced_summary])[0]
+                        confidence = float(proba.max())
+                    except Exception:
+                        confidence = 0.8
+                else:
+                    confidence = 0.8
+                    
+            except Exception as e:
+                logger.error(f"Error during TF-IDF prediction: {e}")
+                category_result = 'Outras'
+                confidence = 0.5
+                
+        elif model_type == 'bert':
+            if not bert_classifier:
+                return jsonify({"success": False, "error": "BERT model not loaded"}), 500
+                
+            try:
+                result = bert_classifier.predict_with_confidence(enhanced_summary)
+                category_result = result['predicted_category']
+                confidence = result['confidence']
+            except Exception as e:
+                logger.error(f"BERT prediction error: {e}")
+                try:
+                    category_result = bert_classifier.classify(enhanced_summary)
+                    confidence = 0.5
+                except Exception:
+                    category_result = 'Outras'
+                    confidence = 0.5
+        else:
+            return jsonify({"success": False, "error": f"Unknown model type: {model_type}"}), 400
+        
+        logger.info(f"Categorization result: {category_result} (confidence: {confidence})")
+        
+        result = {
+            "success": True,
+            "original_text": text,
+            "ml_summary": ml_summary,
+            "enhanced_summary": enhanced_summary,
+            "category": category_result,
+            "confidence": confidence,
+            "model_used": model_type
+        }
+        
+        # Step 4: Export to Notion if requested
+        if export_to_notion:
+            notion_token = data.get('notion_token', NOTION_TOKEN)
+            destination_id = data.get('destination_id', NOTION_DATABASE_ID or NOTION_PARENT_PAGE_ID)
+            export_type = data.get('export_type', 'page')
+            title = data.get('title', f"ResumeAI: {category_result}")
+            
+            if not notion_token:
+                result["notion_export"] = {"success": False, "error": "Notion token is required"}
+                return jsonify(result)
+                
+            if not destination_id:
+                result["notion_export"] = {"success": False, "error": "Destination ID is required"}
+                return jsonify(result)
+                
+            try:
+                notion = NotionExporter(notion_token)
+                
+                # Create content with both original and summary
+                export_content = f"""**Resumo Aprimorado:**
+{enhanced_summary}
+
+**Resumo ML (BART):**
+{ml_summary}
+
+**Texto Original:**
+{text}
+
+**Categoria:** {category_result}
+**Confiança:** {confidence:.3f}
+**Modelo:** {model_type.upper()}"""
+                
+                if export_type == 'page':
+                    response = notion.create_page(
+                        parent_page_id=destination_id,
+                        title=title,
+                        content=export_content,
+                        categories=[category_result],
+                        source_type=data.get('source_type', 'text'),
+                        language=data.get('language', 'pt-BR')
+                    )
+                    
+                    if response:
+                        page_id = response.get('id', '')
+                        notion_url = f"https://notion.so/{page_id.replace('-', '')}"
+                        result["notion_export"] = {
+                            "success": True,
+                            "page_id": page_id,
+                            "notion_url": notion_url
+                        }
+                    else:
+                        result["notion_export"] = {"success": False, "error": "Failed to create Notion page"}
+                
+                elif export_type == 'database':
+                    response = notion.create_database_item(
+                        database_id=destination_id,
+                        title=title,
+                        content=export_content,
+                        categories=[category_result],
+                        source_type=data.get('source_type', 'text'),
+                        source_name=data.get('source_name', 'ResumeAI'),
+                        language=data.get('language', 'pt-BR')
+                    )
+                    
+                    if response:
+                        item_id = response.get('id', '')
+                        notion_url = f"https://notion.so/{item_id.replace('-', '')}"
+                        result["notion_export"] = {
+                            "success": True,
+                            "item_id": item_id,
+                            "notion_url": notion_url
+                        }
+                    else:
+                        result["notion_export"] = {"success": False, "error": "Failed to add item to Notion database"}
+                
+                else:
+                    result["notion_export"] = {"success": False, "error": f"Invalid export type: {export_type}"}
+            
+            except Exception as e:
+                logger.error(f"Error exporting to Notion: {e}")
+                result["notion_export"] = {"success": False, "error": str(e)}
+        
+        return jsonify(result)
+    
+    except Exception as e:
+        logger.error(f"Error during full processing: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/audio-devices', methods=['GET'])
+def list_audio_devices():
+    """List available audio input devices"""
+    if not listar_dispositivos_entrada:
+        return jsonify({"success": False, "error": "Audio recording not available"}), 500
+    
+    try:
+        import sounddevice as sd
+        import io
+        from contextlib import redirect_stdout
+        
+        # Capture the output of listar_dispositivos_entrada
+        f = io.StringIO()
+        with redirect_stdout(f):
+            device_ids = listar_dispositivos_entrada()
+        
+        # Get device info
+        devices = []
+        for device_id in device_ids:
+            info = sd.query_devices(device_id)
+            devices.append({
+                "id": device_id,
+                "name": info['name'],
+                "channels": info['max_input_channels']
+            })
+        
+        # Find suggested device
+        suggested_id = sugerir_dispositivo_padrao(device_ids) if sugerir_dispositivo_padrao else None
+        
+        return jsonify({
+            "success": True,
+            "devices": devices,
+            "suggested_id": suggested_id
+        })
+    except Exception as e:
+        logger.error(f"Error listing audio devices: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/start-recording', methods=['POST'])
+def start_recording():
+    """Start audio recording session"""
+    if not gravar_sem_limite:
+        return jsonify({"success": False, "error": "Audio recording not available"}), 500
+    
+    data = request.get_json()
+    device_id = data.get('device_id')
+    
+    if device_id is None:
+        return jsonify({"success": False, "error": "Device ID is required"}), 400
+    
+    # Store recording info in session
+    session['recording_device'] = device_id
+    session['is_recording'] = True
+    
+    return jsonify({
+        "success": True,
+        "message": "Recording session initialized",
+        "session_id": session.get('_id', 'default')
+    })
+
+@app.route('/api/stop-recording', methods=['POST'])
+def stop_recording():
+    """Stop recording and process the audio"""
+    if not session.get('is_recording'):
+        return jsonify({"success": False, "error": "No active recording session"}), 400
+    
+    try:
+        # For now, we'll return a message indicating this needs to be implemented
+        # In a real implementation, we'd need to handle the recording differently
+        # since gravar_sem_limite is blocking and expects user input
+        
+        session['is_recording'] = False
+        
+        return jsonify({
+            "success": False,
+            "error": "Server-side recording requires a different implementation approach. Please use the browser-based recording for now."
+        })
+    except Exception as e:
+        logger.error(f"Error stopping recording: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/transcribe-audio', methods=['POST'])
+def transcribe_audio_file():
+    """Transcribe an uploaded audio file"""
+    if not transcribe_audio:
+        return jsonify({"success": False, "error": "Audio transcription not available"}), 500
+    
+    # Check if file was uploaded
+    if 'audio' not in request.files:
+        return jsonify({"success": False, "error": "No audio file uploaded"}), 400
+    
+    file = request.files['audio']
+    if file.filename == '':
+        return jsonify({"success": False, "error": "No file selected"}), 400
+    
+    try:
+        # Save the uploaded file temporarily
+        import tempfile
+        import os
+        
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
+            file.save(tmp_file.name)
+            temp_path = tmp_file.name
+        
+        # Transcribe the audio
+        logger.info(f"Transcribing audio file: {temp_path}")
+        transcription = transcribe_audio(temp_path)
+        
+        # Clean up the temporary file
+        os.unlink(temp_path)
+        
+        return jsonify({
+            "success": True,
+            "transcription": transcription
+        })
+    except Exception as e:
+        logger.error(f"Error transcribing audio: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/generate-summary', methods=['POST'])
+def generate_summary():
+    """Generate a summary from text using ML and Gemini"""
+    if not gerar_resumo_completo or not resumir_com_gemini:
+        return jsonify({"success": False, "error": "Summary generation not available"}), 500
+    
+    data = request.get_json()
+    text = data.get('text', '').strip()
+    
+    if not text:
+        return jsonify({"success": False, "error": "No text provided"}), 400
+    
+    try:
+        # First generate ML summary
+        ml_summary = gerar_resumo_completo(text)
+        
+        # Then enhance with Gemini
+        final_summary = resumir_com_gemini(ml_summary)
+        
+        return jsonify({
+            "success": True,
+            "ml_summary": ml_summary,
+            "final_summary": final_summary
+        })
+    except Exception as e:
+        logger.error(f"Error generating summary: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':

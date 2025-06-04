@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     initTextInput();
     initSpeechToText();
+    initWhisperRecording();
     initNotionExport();
     
     console.log('ResumeAI Integrated App initialized successfully');
@@ -53,7 +54,28 @@ const elements = {
     exportTitle: document.getElementById('export-title'),
     exportBtn: document.getElementById('export-btn'),
     exportResult: document.getElementById('export-result'),
-    exportStatus: document.getElementById('export-status')
+    exportStatus: document.getElementById('export-status'),
+    
+    // Whisper Recording elements
+    browserRecording: document.getElementById('browser-recording'),
+    whisperRecording: document.getElementById('whisper-recording'),
+    audioFileInput: document.getElementById('audio-file-input'),
+    transcribeFileBtn: document.getElementById('transcribe-file-btn'),
+    audioDeviceSelect: document.getElementById('audio-device-select'),
+    refreshDevicesBtn: document.getElementById('refresh-devices-btn'),
+    whisperTranscriptText: document.getElementById('whisper-transcript-text'),
+    copyWhisperTranscriptBtn: document.getElementById('copy-whisper-transcript'),
+    whisperModelSelect: document.getElementById('whisper-model-select'),
+    processWhisperTranscriptBtn: document.getElementById('process-whisper-transcript-btn'),
+    summarySection: document.getElementById('summary-section'),
+    summaryText: document.getElementById('summary-text'),
+    useSummaryBtn: document.getElementById('use-summary-btn'),
+    
+    // Summarization elements
+    enableSummarization: document.getElementById('enable-summarization'),
+    summaryResults: document.getElementById('summary-results'),
+    enhancedSummary: document.getElementById('enhanced-summary'),
+    mlSummary: document.getElementById('ml-summary')
 };
 
 // Global variables
@@ -141,11 +163,18 @@ function initTextInput() {
         }
         
         const selectedModel = elements.modelSelect.value;
-        await processContent('text', text, selectedModel);
+        const useSummarization = elements.enableSummarization.checked;
+        
+        if (useSummarization) {
+            await processContentWithSummary('text', text, selectedModel);
+        } else {
+            await processContent('text', text, selectedModel);
+        }
     });
     
     elements.clearTextBtn.addEventListener('click', () => {
         elements.textInput.value = '';
+        elements.enableSummarization.checked = false;
     });
 }
 
@@ -394,12 +423,85 @@ async function processContent(type, content, modelType = 'tfidf') {
 }
 
 /**
+ * Process Content with Summarization
+ * Full pipeline: ML Summary -> Gemini Enhancement -> Categorization
+ */
+async function processContentWithSummary(type, content, modelType = 'tfidf') {
+    // Show loading state
+    showLoadingState(true);
+    
+    // Show processing steps
+    showProcessingSteps();
+    
+    try {
+        updateProcessingStep(1, 'active'); // ML Summary step
+        
+        // Send request to backend for full pipeline
+        const response = await fetch('/api/process-with-summary', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                text: content,
+                model: modelType,
+                export_to_notion: false
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Error: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error || 'Erro desconhecido durante o processamento');
+        }
+        
+        updateProcessingStep(1, 'completed'); // ML Summary completed
+        updateProcessingStep(2, 'completed'); // Gemini completed
+        updateProcessingStep(3, 'completed'); // Categorization completed
+        
+        // Store data for potential Notion export
+        categoryData = {
+            category: data.category,
+            confidence: data.confidence || 0.8,
+            text: data.enhanced_summary, // Use enhanced summary for export
+            original_text: data.original_text,
+            ml_summary: data.ml_summary,
+            enhanced_summary: data.enhanced_summary,
+            model: modelType,
+            source_type: type === 'transcript' ? 'audio' : 'text',
+            has_summary: true
+        };
+        
+        // Display results with summary information
+        displayResultsWithSummary(data);
+        
+        // Switch to results tab
+        document.querySelector('[data-tab="results-tab"]').click();
+        
+        // Enable export button
+        elements.exportBtn.disabled = false;
+        
+        hideProcessingSteps();
+        
+    } catch (error) {
+        console.error('Error processing content with summary:', error);
+        showNotification('Erro ao processar o conteúdo com resumo: ' + error.message, 'error');
+        hideProcessingSteps();
+    } finally {
+        showLoadingState(false);
+    }
+}
+
+/**
  * Display Results
  * Show categorization results in the UI
  */
 function displayResults(text, category, confidence = 0.8) {
     elements.resultsContainer.classList.remove('hidden');
     elements.noResults.classList.add('hidden');
+    elements.summaryResults.classList.add('hidden'); // Hide summary section
     
     // Update category and confidence display
     elements.categoryResult.textContent = category;
@@ -419,6 +521,98 @@ function displayResults(text, category, confidence = 0.8) {
     
     // Display processed text
     elements.processedText.textContent = text;
+}
+
+/**
+ * Display Results with Summary
+ * Show categorization results including summary information
+ */
+function displayResultsWithSummary(data) {
+    elements.resultsContainer.classList.remove('hidden');
+    elements.noResults.classList.add('hidden');
+    elements.summaryResults.classList.remove('hidden'); // Show summary section
+    
+    // Update category and confidence display
+    elements.categoryResult.textContent = data.category;
+    
+    const confidencePercent = Math.round((data.confidence || 0.8) * 100);
+    elements.confidenceValue.textContent = `${confidencePercent}%`;
+    elements.confidenceBar.style.width = `${confidencePercent}%`;
+    
+    // Add color coding to confidence bar
+    if (confidencePercent >= 80) {
+        elements.confidenceBar.style.backgroundColor = 'var(--secondary-color)';
+    } else if (confidencePercent >= 50) {
+        elements.confidenceBar.style.backgroundColor = '#FFC107'; // Amber
+    } else {
+        elements.confidenceBar.style.backgroundColor = 'var(--accent-color)';
+    }
+    
+    // Display summaries
+    elements.enhancedSummary.textContent = data.enhanced_summary;
+    elements.mlSummary.textContent = data.ml_summary;
+    
+    // Display original text
+    elements.processedText.textContent = data.original_text;
+}
+
+/**
+ * Processing Steps Functions
+ */
+function showProcessingSteps() {
+    // Create processing steps UI if it doesn't exist
+    let stepsContainer = document.getElementById('processing-steps');
+    if (!stepsContainer) {
+        stepsContainer = document.createElement('div');
+        stepsContainer.id = 'processing-steps';
+        stepsContainer.className = 'processing-steps';
+        stepsContainer.innerHTML = `
+            <h4>Processamento em Andamento:</h4>
+            <div class="processing-step" id="step-1">
+                <span class="step-icon pending"></span>
+                <span>1. Gerando resumo com ML (BART)</span>
+            </div>
+            <div class="processing-step" id="step-2">
+                <span class="step-icon pending"></span>
+                <span>2. Aprimorando resumo com Gemini</span>
+            </div>
+            <div class="processing-step" id="step-3">
+                <span class="step-icon pending"></span>
+                <span>3. Categorizando resumo aprimorado</span>
+            </div>
+        `;
+        
+        // Insert before results container
+        const resultsTab = document.getElementById('results-tab');
+        resultsTab.insertBefore(stepsContainer, elements.noResults);
+    }
+    
+    // Reset all steps to pending
+    for (let i = 1; i <= 3; i++) {
+        updateProcessingStep(i, 'pending');
+    }
+}
+
+function updateProcessingStep(stepNumber, status) {
+    const step = document.getElementById(`step-${stepNumber}`);
+    const icon = step.querySelector('.step-icon');
+    
+    // Remove all status classes
+    step.classList.remove('active', 'completed');
+    icon.classList.remove('pending', 'active', 'completed');
+    
+    // Add new status
+    step.classList.add(status);
+    icon.classList.add(status);
+}
+
+function hideProcessingSteps() {
+    const stepsContainer = document.getElementById('processing-steps');
+    if (stepsContainer) {
+        setTimeout(() => {
+            stepsContainer.style.display = 'none';
+        }, 2000); // Hide after 2 seconds
+    }
 }
 
 /**
@@ -526,4 +720,169 @@ function showLoadingState(isLoading) {
 function showNotification(message, type = 'info') {
     // Simple alert for now, but could be replaced with a toast notification system
     alert(message);
+}
+
+/**
+ * Initialize Whisper Recording functionality
+ * Handles file uploads and device-based recording with Whisper transcription
+ */
+function initWhisperRecording() {
+    // Recording mode toggle
+    const recordingModeRadios = document.querySelectorAll('input[name="recording-mode"]');
+    recordingModeRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            if (e.target.value === 'browser') {
+                elements.browserRecording.style.display = 'block';
+                elements.whisperRecording.style.display = 'none';
+            } else {
+                elements.browserRecording.style.display = 'none';
+                elements.whisperRecording.style.display = 'block';
+                // Load audio devices when switching to Whisper mode
+                loadAudioDevices();
+            }
+        });
+    });
+    
+    // File upload handling
+    elements.audioFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        elements.transcribeFileBtn.disabled = !file;
+    });
+    
+    elements.transcribeFileBtn.addEventListener('click', async () => {
+        const file = elements.audioFileInput.files[0];
+        if (!file) {
+            showNotification('Por favor, selecione um arquivo de áudio primeiro.', 'error');
+            return;
+        }
+        
+        // Show loading state
+        showLoadingState(true);
+        elements.transcribeFileBtn.disabled = true;
+        
+        try {
+            const formData = new FormData();
+            formData.append('audio', file);
+            
+            const response = await fetch('/api/transcribe-audio', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                elements.whisperTranscriptText.textContent = data.transcription;
+                elements.copyWhisperTranscriptBtn.disabled = false;
+                elements.processWhisperTranscriptBtn.disabled = false;
+                
+                // Optionally generate summary
+                await generateSummary(data.transcription);
+            } else {
+                throw new Error(data.error || 'Erro na transcrição');
+            }
+        } catch (error) {
+            console.error('Error transcribing audio:', error);
+            showNotification('Erro ao transcrever áudio: ' + error.message, 'error');
+        } finally {
+            showLoadingState(false);
+            elements.transcribeFileBtn.disabled = false;
+        }
+    });
+    
+    // Copy whisper transcript
+    elements.copyWhisperTranscriptBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(elements.whisperTranscriptText.textContent)
+            .then(() => showNotification('Texto copiado para a área de transferência', 'success'))
+            .catch(() => showNotification('Não foi possível copiar o texto', 'error'));
+    });
+    
+    // Process whisper transcript
+    elements.processWhisperTranscriptBtn.addEventListener('click', async () => {
+        const transcript = elements.whisperTranscriptText.textContent.trim();
+        if (!transcript) {
+            showNotification('A transcrição está vazia. Transcreva um áudio primeiro.', 'error');
+            return;
+        }
+        
+        const selectedModel = elements.whisperModelSelect.value;
+        await processContent('whisper_transcript', transcript, selectedModel);
+    });
+    
+    // Refresh audio devices
+    elements.refreshDevicesBtn.addEventListener('click', () => {
+        loadAudioDevices();
+    });
+    
+    // Use summary button
+    elements.useSummaryBtn.addEventListener('click', async () => {
+        const summary = elements.summaryText.textContent.trim();
+        if (!summary) {
+            showNotification('Nenhum resumo disponível.', 'error');
+            return;
+        }
+        
+        const selectedModel = elements.whisperModelSelect.value;
+        await processContent('summary', summary, selectedModel);
+    });
+}
+
+/**
+ * Load available audio devices
+ */
+async function loadAudioDevices() {
+    try {
+        const response = await fetch('/api/audio-devices');
+        const data = await response.json();
+        
+        if (data.success) {
+            elements.audioDeviceSelect.innerHTML = '';
+            
+            // Add default option
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = 'Selecione um dispositivo';
+            elements.audioDeviceSelect.appendChild(defaultOption);
+            
+            // Add device options
+            data.devices.forEach(device => {
+                const option = document.createElement('option');
+                option.value = device.id;
+                option.textContent = `${device.name} (${device.channels} canais)`;
+                if (device.id === data.suggested_id) {
+                    option.textContent += ' (Recomendado)';
+                    option.selected = true;
+                }
+                elements.audioDeviceSelect.appendChild(option);
+            });
+        } else {
+            elements.audioDeviceSelect.innerHTML = '<option value="">Erro ao carregar dispositivos</option>';
+        }
+    } catch (error) {
+        console.error('Error loading audio devices:', error);
+        elements.audioDeviceSelect.innerHTML = '<option value="">Erro ao carregar dispositivos</option>';
+    }
+}
+
+/**
+ * Generate summary from transcription
+ */
+async function generateSummary(text) {
+    try {
+        const response = await fetch('/api/generate-summary', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            elements.summaryText.textContent = data.final_summary;
+            elements.summarySection.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Error generating summary:', error);
+        // Don't show error as summary is optional
+    }
 }

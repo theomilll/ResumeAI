@@ -45,6 +45,13 @@
                             <option value="bert">BERT (mais preciso)</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="enable-summarization">
+                            <span>Processar com resumo automático (BART + Gemini)</span>
+                        </label>
+                        <p class="help-text">Gera resumo com ML e aprimora com Gemini antes da categorização</p>
+                    </div>
                     <div class="action-buttons">
                         <button id="process-text-btn" class="primary-btn">
                             <span class="material-symbols-outlined">analytics</span>
@@ -62,7 +69,20 @@
                     <h2>Gravação de Áudio</h2>
                     <p>Use o microfone para gravar seu conteúdo automaticamente.</p>
 
-                    <div class="speech-container">
+                    <!-- Recording Mode Toggle -->
+                    <div class="recording-mode-toggle">
+                        <label class="toggle-label">
+                            <input type="radio" name="recording-mode" value="browser" checked>
+                            <span>Gravação no Navegador</span>
+                        </label>
+                        <label class="toggle-label">
+                            <input type="radio" name="recording-mode" value="whisper">
+                            <span>Gravação com Whisper (Mais Preciso)</span>
+                        </label>
+                    </div>
+
+                    <!-- Browser Recording Section -->
+                    <div id="browser-recording" class="speech-container">
                         <div class="recording-status">
                             <div id="status-indicator" class="status-indicator"></div>
                             <span id="status-text">Pronto para gravar</span>
@@ -97,6 +117,73 @@
                             Processar Transcrição
                         </button>
                     </div>
+
+                    <!-- Whisper Recording Section -->
+                    <div id="whisper-recording" class="speech-container" style="display: none;">
+                        <div class="whisper-info">
+                            <p><strong>Transcrição com Whisper:</strong> Faça upload de um arquivo de áudio ou grave usando um dispositivo de entrada.</p>
+                        </div>
+
+                        <div class="upload-section">
+                            <h3>Upload de Arquivo de Áudio</h3>
+                            <div class="form-group">
+                                <input type="file" id="audio-file-input" accept="audio/*,.wav,.mp3,.m4a,.flac">
+                                <button id="transcribe-file-btn" class="primary-btn" disabled>
+                                    <span class="material-symbols-outlined">transcribe</span>
+                                    Transcrever Arquivo
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="device-recording-section">
+                            <h3>Ou Grave com Dispositivo</h3>
+                            <div class="form-group">
+                                <label for="audio-device-select">Selecione o dispositivo de entrada:</label>
+                                <select id="audio-device-select">
+                                    <option value="">Carregando dispositivos...</option>
+                                </select>
+                                <button id="refresh-devices-btn">
+                                    <span class="material-symbols-outlined">refresh</span>
+                                    Atualizar
+                                </button>
+                            </div>
+                            <p class="device-warning">
+                                <span class="material-symbols-outlined">info</span>
+                                Nota: A gravação com dispositivo requer configuração adicional do servidor.
+                            </p>
+                        </div>
+
+                        <div class="whisper-transcript-container">
+                            <h3>Transcrição (Whisper)</h3>
+                            <div id="whisper-transcript-text" class="transcript"></div>
+                            <button id="copy-whisper-transcript" disabled>
+                                <span class="material-symbols-outlined">content_copy</span>
+                                Copiar Transcrição
+                            </button>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="whisper-model-select">Selecione o modelo de categorização:</label>
+                            <select id="whisper-model-select">
+                                <option value="tfidf">TF-IDF (rápido)</option>
+                                <option value="bert">BERT (mais preciso)</option>
+                            </select>
+                        </div>
+
+                        <button id="process-whisper-transcript-btn" class="primary-btn" disabled>
+                            <span class="material-symbols-outlined">analytics</span>
+                            Processar Transcrição
+                        </button>
+
+                        <div class="summary-section" id="summary-section" style="display: none;">
+                            <h3>Resumo Gerado</h3>
+                            <div id="summary-text" class="summary-content"></div>
+                            <button id="use-summary-btn" class="primary-btn">
+                                <span class="material-symbols-outlined">check_circle</span>
+                                Usar Resumo para Categorização
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Results Tab -->
@@ -117,6 +204,15 @@
                         <div class="confidence-bar-container">
                             <div id="confidence-bar" class="confidence-bar"></div>
                             <span id="confidence-value"></span>
+                        </div>
+                        
+                        <!-- Summary Section -->
+                        <div id="summary-results" class="summary-results hidden">
+                            <h3>Resumo Aprimorado (Gemini):</h3>
+                            <div id="enhanced-summary" class="processed-content summary-enhanced"></div>
+                            
+                            <h3>Resumo ML (BART):</h3>
+                            <div id="ml-summary" class="processed-content summary-ml"></div>
                         </div>
                         
                         <h3>Conteúdo Processado:</h3>

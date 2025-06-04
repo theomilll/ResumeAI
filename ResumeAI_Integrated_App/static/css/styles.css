@@ -420,3 +420,192 @@ body.loading::before {
         transform: translate(-50%, -50%) rotate(360deg);
     }
 }
+
+/* Recording Mode Toggle */
+.recording-mode-toggle {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background-color: var(--light-gray);
+    border-radius: 8px;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.toggle-label input[type="radio"] {
+    cursor: pointer;
+}
+
+/* Whisper Recording Styles */
+.whisper-info {
+    background-color: #e3f2fd;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+}
+
+.upload-section, .device-recording-section {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background-color: var(--light-gray);
+    border-radius: 8px;
+}
+
+.upload-section h3, .device-recording-section h3 {
+    margin-bottom: 1rem;
+    color: var(--primary-color);
+}
+
+#audio-file-input {
+    margin-bottom: 1rem;
+}
+
+.device-warning {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    margin-top: 1rem;
+    font-size: 0.9rem;
+}
+
+.whisper-transcript-container {
+    margin: 2rem 0;
+}
+
+.summary-section {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background-color: #f0f7ff;
+    border-radius: 8px;
+    border: 1px solid #cfe2ff;
+}
+
+.summary-content {
+    padding: 1rem;
+    background-color: white;
+    border-radius: 4px;
+    margin: 1rem 0;
+    border: 1px solid var(--medium-gray);
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+#refresh-devices-btn {
+    margin-left: 0.5rem;
+    padding: 0.5rem 1rem;
+    background-color: var(--secondary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    transition: var(--transition);
+}
+
+#refresh-devices-btn:hover {
+    background-color: #2d8b47;
+}
+
+/* Summarization UI Styles */
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.checkbox-label input[type="checkbox"] {
+    cursor: pointer;
+    transform: scale(1.2);
+}
+
+.help-text {
+    font-size: 0.9rem;
+    color: var(--dark-gray);
+    margin-top: 0.5rem;
+    margin-bottom: 0;
+}
+
+.summary-results {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid var(--medium-gray);
+}
+
+.summary-enhanced {
+    background-color: #e8f5e8;
+    border-left: 4px solid var(--secondary-color);
+}
+
+.summary-ml {
+    background-color: #e3f2fd;
+    border-left: 4px solid var(--primary-color);
+}
+
+.processing-steps {
+    margin: 1rem 0;
+    padding: 1rem;
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+}
+
+.processing-step {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+    font-size: 0.9rem;
+}
+
+.processing-step.active {
+    font-weight: 600;
+    color: var(--primary-color);
+}
+
+.processing-step.completed {
+    color: var(--secondary-color);
+}
+
+.step-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.step-icon.pending {
+    background-color: var(--medium-gray);
+}
+
+.step-icon.active {
+    background-color: var(--primary-color);
+    animation: pulse 1.5s infinite;
+}
+
+.step-icon.completed {
+    background-color: var(--secondary-color);
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
