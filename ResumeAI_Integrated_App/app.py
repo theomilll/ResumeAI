@@ -97,11 +97,13 @@ except ImportError as e:
 try:
     sys.path.insert(0, os.path.join(CATEGORIZATION_PATH, 'src'))
     from predict import SummaryClassifier
+    from predict_bert import BERTSummaryClassifier
     from predict_tfidf import load_label_encoder as load_tfidf_encoder
     logger.info("Successfully imported prediction modules")
 except ImportError as e:
     logger.error(f"Failed to import prediction modules: {e}")
     SummaryClassifier = None
+    BERTSummaryClassifier = None
     load_tfidf_encoder = None
 
 app = Flask(__name__)
@@ -117,13 +119,15 @@ NOTION_PARENT_PAGE_ID = os.environ.get("NOTION_PARENT_PAGE_ID", "")
 TFIDF_MODEL_PATH = os.path.join(CATEGORIZATION_PATH, 'models', 'tfidf', 'tfidf_pipeline.joblib')
 TFIDF_ENCODER_PATH = os.path.join(CATEGORIZATION_PATH, 'models', 'tfidf', 'label_encoder.csv')
 BERT_MODEL_PATH = os.path.join(CATEGORIZATION_PATH, 'models', 'final')
+BERT_ENHANCED_MODEL_PATH = os.path.join(CATEGORIZATION_PATH, 'models', 'bert_enhanced')
 
 logger.info(f"TF-IDF model path: {TFIDF_MODEL_PATH}")
 logger.info(f"TF-IDF encoder path: {TFIDF_ENCODER_PATH}")
 logger.info(f"BERT model path: {BERT_MODEL_PATH}")
+logger.info(f"BERT enhanced model path: {BERT_ENHANCED_MODEL_PATH}")
 
 # Check if model files exist
-for path in [TFIDF_MODEL_PATH, TFIDF_ENCODER_PATH, BERT_MODEL_PATH]:
+for path in [TFIDF_MODEL_PATH, TFIDF_ENCODER_PATH, BERT_MODEL_PATH, BERT_ENHANCED_MODEL_PATH]:
     if os.path.exists(path):
         logger.info(f"Found model file: {path}")
     else:
@@ -174,7 +178,7 @@ except Exception as e:
     tfidf_pipeline = TfidfBackupClassifier()
     tfidf_encoder = tfidf_pipeline.categories
 
-# Load BERT model
+# Load BERT model (legacy)
 bert_classifier = None
 try:
     if os.path.exists(BERT_MODEL_PATH) and SummaryClassifier:
@@ -185,6 +189,20 @@ try:
         logger.warning("BERT model path does not exist or class not available")
 except Exception as e:
     logger.error(f"BERT model loading failed: {e}")
+    import traceback
+    traceback.print_exc()
+
+# Load Enhanced BERT model
+bert_enhanced_classifier = None
+try:
+    if os.path.exists(BERT_ENHANCED_MODEL_PATH) and BERTSummaryClassifier:
+        logger.info(f"Loading enhanced BERT model from {BERT_ENHANCED_MODEL_PATH}...")
+        bert_enhanced_classifier = BERTSummaryClassifier(BERT_ENHANCED_MODEL_PATH)
+        logger.info("Enhanced BERT classifier loaded successfully.")
+    else:
+        logger.warning("Enhanced BERT model path does not exist or class not available")
+except Exception as e:
+    logger.error(f"Enhanced BERT model loading failed: {e}")
     import traceback
     traceback.print_exc()
 
@@ -232,15 +250,30 @@ def list_models():
     if bert_classifier:
         models.append({
             "id": "bert", 
-            "name": "BERT Model", 
-            "description": "More accurate deep learning model (slower)",
+            "name": "BERT Model (Legacy)", 
+            "description": "LSTM-based model with BERT tokenizer",
             "available": True
         })
     else:
         models.append({
             "id": "bert", 
-            "name": "BERT Model (Unavailable)", 
+            "name": "BERT Model (Legacy - Unavailable)", 
             "description": "Model could not be loaded",
+            "available": False
+        })
+    
+    if bert_enhanced_classifier:
+        models.append({
+            "id": "bert_enhanced", 
+            "name": "BERT Enhanced", 
+            "description": "Fine-tuned BERT model (78% accuracy, most precise)",
+            "available": True
+        })
+    else:
+        models.append({
+            "id": "bert_enhanced", 
+            "name": "BERT Enhanced (Unavailable)", 
+            "description": "Enhanced model could not be loaded",
             "available": False
         })
     
@@ -345,6 +378,31 @@ def categorize_text():
                 except Exception as e:
                     logger.error(f"BERT classification error: {e}")
                     return jsonify({"success": True, "category": "Outras", "note": "Fallback after error"})
+        
+        elif model_type == 'bert_enhanced':
+            if not bert_enhanced_classifier:
+                logger.error("Enhanced BERT classifier not loaded")
+                return jsonify({"success": False, "error": "Enhanced BERT model not loaded"}), 500
+            
+            logger.info("Using Enhanced BERT model for prediction")
+            try:
+                if include_confidence:
+                    category, confidences = bert_enhanced_classifier.classify(text, return_confidence=True)
+                    max_confidence = max(confidences.values()) if confidences else 0.5
+                    logger.info(f"Enhanced BERT prediction with confidence: {category} ({max_confidence:.3f})")
+                    return jsonify({
+                        "success": True, 
+                        "category": category,
+                        "confidence": max_confidence,
+                        "confidences": confidences
+                    })
+                else:
+                    category = bert_enhanced_classifier.classify(text)
+                    logger.info(f"Enhanced BERT classification result: {category}")
+                    return jsonify({"success": True, "category": category})
+            except Exception as e:
+                logger.error(f"Enhanced BERT classification error: {e}")
+                return jsonify({"success": False, "error": f"Enhanced BERT error: {str(e)}"}), 500
         else:
             logger.warning(f"Unknown model type requested: {model_type}")
             return jsonify({"success": False, "error": f"Unknown model type: {model_type}"}), 400
@@ -497,6 +555,20 @@ def process():
                     import traceback
                     traceback.print_exc()
                     return jsonify({"success": False, "error": f"BERT classification error: {str(bert_error)}"}), 500
+            
+            elif model_type == 'bert_enhanced':
+                if not bert_enhanced_classifier:
+                    return jsonify({"success": False, "error": "Enhanced BERT model not loaded"}), 500
+                
+                logger.info(f"Predicting with Enhanced BERT model: {text[:50]}...")
+                try:
+                    category_result = bert_enhanced_classifier.classify(text)
+                    logger.info(f"Enhanced BERT predicted category: {category_result}")
+                except Exception as bert_error:
+                    logger.error(f"Enhanced BERT classification error: {bert_error}")
+                    import traceback
+                    traceback.print_exc()
+                    return jsonify({"success": False, "error": f"Enhanced BERT classification error: {str(bert_error)}"}), 500
         except Exception as e:
             logger.error(f"Error during categorization: {str(e)}")
             import traceback
@@ -667,6 +739,22 @@ def process_with_summary():
                 logger.error(f"BERT prediction error: {e}")
                 try:
                     category_result = bert_classifier.classify(enhanced_summary)
+                    confidence = 0.5
+                except Exception:
+                    category_result = 'Outras'
+                    confidence = 0.5
+        
+        elif model_type == 'bert_enhanced':
+            if not bert_enhanced_classifier:
+                return jsonify({"success": False, "error": "Enhanced BERT model not loaded"}), 500
+                
+            try:
+                category_result, confidences = bert_enhanced_classifier.classify(enhanced_summary, return_confidence=True)
+                confidence = max(confidences.values()) if confidences else 0.5
+            except Exception as e:
+                logger.error(f"Enhanced BERT prediction error: {e}")
+                try:
+                    category_result = bert_enhanced_classifier.classify(enhanced_summary)
                     confidence = 0.5
                 except Exception:
                     category_result = 'Outras'
