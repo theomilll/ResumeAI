@@ -1,8 +1,19 @@
 import google.generativeai as genai
+import os
+from dotenv import load_dotenv
 
-genai.configure(api_key="")
+# Load environment variables
+load_dotenv()
+
+# Configure Gemini API
+GOOGLE_GEMINI_API_KEY = os.getenv("GOOGLE_GEMINI_API_KEY", "")
+genai.configure(api_key=GOOGLE_GEMINI_API_KEY)
 
 def resumir_com_gemini(texto):
+    if not GOOGLE_GEMINI_API_KEY:
+        print("[Aviso] GOOGLE_GEMINI_API_KEY não configurada. Retornando texto original.")
+        return texto
+    
     model = genai.GenerativeModel("gemini-1.5-flash-002")
     
     prompt = f"""

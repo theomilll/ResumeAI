@@ -2,14 +2,19 @@
 
 import requests
 import base64
+import os
 from notion_client import Client
+from dotenv import load_dotenv
 
-CLIENT_ID = ''
-CLIENT_SECRET = ''
-REDIRECT_URI = ''
+# Load environment variables
+load_dotenv()
 
-AUTHORIZATION_URL = ''
-TOKEN_URL = ""
+CLIENT_ID = os.getenv('NOTION_CLIENT_ID', '')
+CLIENT_SECRET = os.getenv('NOTION_CLIENT_SECRET', '')
+REDIRECT_URI = os.getenv('NOTION_REDIRECT_URI', 'http://localhost:5000/oauth/callback')
+
+AUTHORIZATION_URL = 'https://api.notion.com/v1/oauth/authorize'
+TOKEN_URL = "https://api.notion.com/v1/oauth/token"
 
 
 def gerar_url_autenticacao():

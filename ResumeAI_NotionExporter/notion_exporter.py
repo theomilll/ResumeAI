@@ -53,8 +53,10 @@ class NotionExporter:
         Returns:
             Resposta da API do Notion com os dados da página criada
         """
+        # For regular pages (not database items), we don't use properties
+        # The title is set using a special properties structure for pages
         properties = {
-            "Name": {
+            "title": {
                 "title": [
                     {
                         "text": {
@@ -65,41 +67,37 @@ class NotionExporter:
             }
         }
         
-        # Adicionar data da criação
-        properties["Data"] = {
-            "date": {
-                "start": datetime.now().strftime("%Y-%m-%d")
-            }
-        }
-        
-        # Adicionar tipo de fonte se houver
-        if source_type:
-            properties["Tipo"] = {
-                "select": {
-                    "name": source_type
-                }
-            }
-            
-        # Adicionar nome da fonte se houver
-        if source_name:
-            properties["Fonte"] = {
-                "rich_text": [
-                    {
-                        "text": {
-                            "content": source_name
-                        }
-                    }
-                ]
-            }
-            
-        # Adicionar idioma
-        properties["Idioma"] = {
-            "select": {
-                "name": language
-            }
-        }
-        
         children = []
+        
+        # Add metadata as content blocks (since we can't use properties for regular pages)
+        if source_type or source_name or language != "pt-br":
+            metadata_lines = []
+            if source_type:
+                metadata_lines.append(f"📋 Tipo: {source_type}")
+            if source_name:
+                metadata_lines.append(f"📄 Fonte: {source_name}")
+            metadata_lines.append(f"🌐 Idioma: {language}")
+            metadata_lines.append(f"📅 Data: {datetime.now().strftime('%d/%m/%Y')}")
+            
+            metadata_text = " | ".join(metadata_lines)
+            children.append({
+                "object": "block",
+                "type": "callout",
+                "callout": {
+                    "rich_text": [
+                        {
+                            "type": "text",
+                            "text": {
+                                "content": metadata_text
+                            }
+                        }
+                    ],
+                    "icon": {
+                        "emoji": "ℹ️"
+                    },
+                    "color": "gray_background"
+                }
+            })
         
         # Adicionar categorias como tags
         if categories and len(categories) > 0:
@@ -122,8 +120,9 @@ class NotionExporter:
                     "color": "blue_background"
                 }
             })
-            
-            # Adicionar linha divisória
+        
+        # Adicionar linha divisória
+        if children:
             children.append({
                 "object": "block",
                 "type": "divider",

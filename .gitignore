@@ -1,0 +1,78 @@
+# Environment variables - NEVER commit these files
+.env
+.env.local
+.env.development
+.env.production
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Audio files (temporary recordings)
+gravacoes/
+*.wav
+*.mp3
+*.m4a
+
+# Large model checkpoint files (keep only final models)
+categorizacao/models/bert_enhanced/checkpoint-*/
+categorizacao/models/checkpoint-epoch-*/
+categorizacao/models/best_model/
+
+# Keep essential enhanced BERT files but ignore large optimizer files
+categorizacao/models/bert_enhanced/optimizer.pt
+categorizacao/models/bert_enhanced/scheduler.pt
+
+# Jupyter
+.ipynb_checkpoints
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/

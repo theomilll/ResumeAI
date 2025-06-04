@@ -58,6 +58,28 @@ Contribuições são bem‑vindas! Abra um *issue* ou *pull request* para partic
 
 ---
 
+## ⚙️ Configuração de Environment Variables
+
+**IMPORTANTE:** Antes de executar o projeto, configure as variáveis de ambiente com suas chaves de API:
+
+1. Copie o arquivo de exemplo:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edite o arquivo `.env` e adicione suas chaves:
+   ```bash
+   # Chaves obrigatórias para funcionalidade completa
+   TEXTGEARS_API_KEY=sua_chave_textgears
+   GOOGLE_GEMINI_API_KEY=sua_chave_gemini
+   NOTION_TOKEN=sua_chave_notion
+   
+   # Gere chaves seguras para Flask
+   python generate_secrets.py
+   ```
+
+3. **Nunca** commite o arquivo `.env` no git (já está no `.gitignore`)
+
 ## 🛠️ Requisitos de Sistema
 
 Além das dependências Python listadas em `requirements.txt`, este projeto requer os seguintes programas instalados no sistema operacional:

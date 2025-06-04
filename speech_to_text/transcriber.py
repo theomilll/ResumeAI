@@ -1,10 +1,15 @@
 import whisper 
 import language_tool_python
 import requests
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 tool = language_tool_python.LanguageTool('pt-BR')
 
-TEXTGEARS_API_KEY="ZmaPxzqxGTGP5xp2"
+TEXTGEARS_API_KEY = os.getenv("TEXTGEARS_API_KEY", "")
 
 #filtro 1
 def corrigir_com_languagetool(texto):
@@ -13,6 +18,10 @@ def corrigir_com_languagetool(texto):
 
 #filtro 2
 def corrigir_com_textgears(texto):
+    if not TEXTGEARS_API_KEY:
+        print("[Aviso] TEXTGEARS_API_KEY não configurada. Pulando correção do TextGears.")
+        return texto
+    
     try:
         response = requests.get(
             "https://api.textgears.com/grammar",
